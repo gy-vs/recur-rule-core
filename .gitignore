@@ -1,0 +1,14 @@
+node_modules/
+bower_components/
+.idea
+.vscode
+*.log
+coverage
+.nyc_output
+dist/
+
+# local secrets
+.env
+.env.*
+*.pem
+*.key

@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "noEmit": true,
+    "noImplicitAny": true,
+    "sourceMap": true,
+    "module": "commonjs",
+    "noEmitOnError": true,
+    "esModuleInterop": true,
+    "target": "es6",
+    "baseUrl": ".",
+    "rootDirs": ["./src/", "./test/"]
+  },
+  "include": ["./src/**/*", "./test/**/*"],
+  "exclude": ["node_modules"]
+}
