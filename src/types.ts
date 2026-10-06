@@ -7,6 +7,11 @@ export interface QueryMethods {
   after(date: Date, inc: boolean): Date | null
 }
 
+export interface IterateOptions {
+  after?: Date
+  inc?: boolean
+}
+
 export type QueryMethodTypes = keyof QueryMethods
 export type IterResultType<M extends QueryMethodTypes> = M extends
   | 'all'

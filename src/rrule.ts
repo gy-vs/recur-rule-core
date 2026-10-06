@@ -12,13 +12,14 @@ import {
   QueryMethods,
   QueryMethodTypes,
   IterResultType,
+  IterateOptions,
 } from './types'
 import { parseOptions, initializeOptions } from './parseoptions'
 import { parseString } from './parsestring'
 import { optionsToString } from './optionstostring'
 import { Cache, CacheKeys } from './cache'
 import { Weekday } from './weekday'
-import { iter } from './iter/index'
+import { iter, iterDates } from './iter/index'
 
 // =============================================================================
 // RRule
@@ -238,6 +239,33 @@ export class RRule implements QueryMethods {
   }
 
   /**
+   * Returns a lazy iterator over the rule's occurrences. Occurrences are
+   * computed one at a time, on demand — rules without COUNT/UNTIL are safe
+   * to iterate (just stop pulling or `break` out of the loop).
+   *
+   * @param {Object?} options
+   * @param {Date} options.after - only yield occurrences at or (by default)
+   * strictly after this datetime, matching the semantics of `after()`.
+   * @param {Boolean} options.inc - when true and `after` is itself an
+   * occurrence, it is yielded as the first value.
+   * @return Iterator&lt;Date&gt;
+   */
+  iterate(options: IterateOptions = {}): IterableIterator<Date> {
+    if (options.after !== undefined && !isValidDate(options.after)) {
+      throw new Error('Invalid date passed in to RRule.iterate')
+    }
+    return iterateRule(this, options)
+  }
+
+  /**
+   * The rule itself is iterable; `for (const date of rule)` starts at the
+   * first occurrence (dtstart).
+   */
+  [Symbol.iterator](): IterableIterator<Date> {
+    return this.iterate()
+  }
+
+  /**
    * Returns the number of recurrences in this set. It will have go trough
    * the whole recurrence, if this hasn't been done before.
    */
@@ -277,5 +305,23 @@ export class RRule implements QueryMethods {
    */
   clone(): RRule {
     return new RRule(this.origOptions)
+  }
+}
+
+/**
+ * Generator backing RRule.iterate(): pulls occurrences from the shared
+ * recurrence engine, lazily, and applies the same min-date filtering
+ * semantics as IterResult('after').
+ */
+function* iterateRule(rule: RRule, options: IterateOptions): Generator<Date> {
+  const minDate = options.after
+    ? options.inc
+      ? options.after
+      : new Date(options.after.getTime() + 1)
+    : null
+
+  for (const date of iterDates(rule.options)) {
+    if (minDate && date < minDate) continue
+    yield date
   }
 }
