@@ -12,13 +12,14 @@ import {
   QueryMethods,
   QueryMethodTypes,
   IterResultType,
+  IterateOptions,
 } from './types'
 import { parseOptions, initializeOptions } from './parseoptions'
 import { parseString } from './parsestring'
 import { optionsToString } from './optionstostring'
 import { Cache, CacheKeys } from './cache'
 import { Weekday } from './weekday'
-import { iter } from './iter/index'
+import { iter, iterGen } from './iter/index'
 
 // =============================================================================
 // RRule
@@ -235,6 +236,53 @@ export class RRule implements QueryMethods {
       this._cacheAdd('after', result, args)
     }
     return result as Date | null
+  }
+
+  /**
+   * Lazily iterates over the occurrences of the rule.
+   *
+   * Without options, iteration begins at the first occurrence (dtstart) and
+   * runs until COUNT/UNTIL is reached; a rule without an end can be iterated
+   * indefinitely and consumed incrementally. With `after`, only occurrences
+   * at or after the given date are produced, following the same semantics as
+   * `after()`: the first occurrence strictly after `after` comes first, or
+   * `after` itself when it is an occurrence and `inc` is true.
+   *
+   * Each returned iterator is independent: opening several iterators (or
+   * calling all/between while one is in use) never affects their results, and
+   * iteration never reads from or fills the result cache.
+   *
+   * @return an IterableIterator of occurrence dates
+   */
+  iterate(options: IterateOptions = {}): IterableIterator<Date> {
+    const after = options.after
+    if (after !== undefined && !isValidDate(after)) {
+      throw new Error('Invalid date passed in to RRule.iterate')
+    }
+    const minDate = after
+      ? options.inc
+        ? after
+        : new Date(after.getTime() + 1)
+      : null
+
+    const generator = iterGen(this.options)
+    const iterate = function* (): Generator<Date> {
+      for (const date of generator) {
+        if (minDate && date < minDate) {
+          continue
+        }
+        yield date
+      }
+    }
+    return iterate()
+  }
+
+  /**
+   * The rule itself is iterable, starting at its first occurrence:
+   * `for (const date of rule) { ... }`.
+   */
+  [Symbol.iterator](): IterableIterator<Date> {
+    return this.iterate()
   }
 
   /**

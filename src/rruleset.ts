@@ -1,9 +1,9 @@
 import { RRule } from './rrule'
-import { sort, timeToUntilString } from './dateutil'
+import { sort, timeToUntilString, isValidDate } from './dateutil'
 import { includes } from './helpers'
 import IterResult from './iterresult'
-import { iterSet } from './iterset'
-import { QueryMethodTypes, IterResultType } from './types'
+import { iterSet, iterSetGen } from './iterset'
+import { QueryMethodTypes, IterResultType, IterateOptions } from './types'
 import { rrulestr } from './rrulestr'
 import { optionsToString } from './optionstostring'
 
@@ -63,6 +63,32 @@ export class RRuleSet extends RRule {
       this._rdate,
       this._exdate,
       this.tzid()
+    )
+  }
+
+  /**
+   * Lazily iterates over the occurrences of the set in chronological order.
+   *
+   * The included rrules and rdates are merged on demand; excluded dates
+   * (exrule/exdate) never appear and each timestamp is yielded at most once.
+   * The produced sequence matches the prefix of what `all()` returns. As with
+   * RRule, every iterator is independent and the cache is neither read nor
+   * filled.
+   *
+   * @return an IterableIterator of occurrence dates
+   */
+  iterate(options: IterateOptions = {}): IterableIterator<Date> {
+    const after = options.after
+    if (after !== undefined && !isValidDate(after)) {
+      throw new Error('Invalid date passed in to RRuleSet.iterate')
+    }
+    return iterSetGen(
+      this._rrule,
+      this._exrule,
+      this._rdate,
+      this._exdate,
+      this.tzid(),
+      options
     )
   }
 

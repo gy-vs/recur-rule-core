@@ -9,15 +9,18 @@ import { DateWithZone } from '../datewithzone'
 import { buildPoslist } from './poslist'
 import { Time, DateTime } from '../datetime'
 
-export function iter<M extends QueryMethodTypes>(
-  iterResult: IterResult<M>,
-  options: ParsedOptions
-) {
+/**
+ * Lazily yields every candidate occurrence of the rule (already rezoned when
+ * tzid is set), starting at dtstart. Candidates before dtstart are skipped as
+ * in `iter`, and COUNT/UNTIL terminate the generator. This never buffers
+ * results, so rules without COUNT or UNTIL can be consumed incrementally.
+ */
+export function* iterGen(options: ParsedOptions): Generator<Date> {
   const { dtstart, freq, interval, until, bysetpos } = options
 
   let count = options.count
   if (count === 0 || interval === 0) {
-    return emitResult(iterResult)
+    return
   }
 
   const counterDate = DateTime.fromDate(dtstart)
@@ -42,19 +45,16 @@ export function iter<M extends QueryMethodTypes>(
       for (let j = 0; j < poslist.length; j++) {
         const res = poslist[j]
         if (until && res > until) {
-          return emitResult(iterResult)
+          return
         }
 
         if (res >= dtstart) {
-          const rezonedDate = rezoneIfNeeded(res, options)
-          if (!iterResult.accept(rezonedDate)) {
-            return emitResult(iterResult)
-          }
+          yield rezoneIfNeeded(res, options)
 
           if (count) {
             --count
             if (!count) {
-              return emitResult(iterResult)
+              return
             }
           }
         }
@@ -71,19 +71,16 @@ export function iter<M extends QueryMethodTypes>(
           const time = timeset[k]
           const res = combine(date, time)
           if (until && res > until) {
-            return emitResult(iterResult)
+            return
           }
 
           if (res >= dtstart) {
-            const rezonedDate = rezoneIfNeeded(res, options)
-            if (!iterResult.accept(rezonedDate)) {
-              return emitResult(iterResult)
-            }
+            yield rezoneIfNeeded(res, options)
 
             if (count) {
               --count
               if (!count) {
-                return emitResult(iterResult)
+                return
               }
             }
           }
@@ -91,14 +88,14 @@ export function iter<M extends QueryMethodTypes>(
       }
     }
     if (options.interval === 0) {
-      return emitResult(iterResult)
+      return
     }
 
     // Handle frequency and interval
     counterDate.add(options, filtered)
 
     if (counterDate.year > MAXYEAR) {
-      return emitResult(iterResult)
+      return
     }
 
     if (!freqIsDailyOrGreater(freq)) {
@@ -112,6 +109,18 @@ export function iter<M extends QueryMethodTypes>(
 
     ii.rebuild(counterDate.year, counterDate.month)
   }
+}
+
+export function iter<M extends QueryMethodTypes>(
+  iterResult: IterResult<M>,
+  options: ParsedOptions
+) {
+  for (const date of iterGen(options)) {
+    if (!iterResult.accept(date)) {
+      break
+    }
+  }
+  return emitResult(iterResult)
 }
 
 function isFiltered(

@@ -14,6 +14,19 @@ export type IterResultType<M extends QueryMethodTypes> = M extends
   ? Date[]
   : Date | null
 
+export interface IterateOptions {
+  /**
+   * Only occurrences at or after this date are yielded, depending on `inc`.
+   * When omitted, iteration starts at the first occurrence (dtstart).
+   */
+  after?: Date
+  /**
+   * When true, an occurrence equal to `after` is included. Defaults to
+   * false, matching the semantics of `after()`/`between()`.
+   */
+  inc?: boolean
+}
+
 export enum Frequency {
   YEARLY = 0,
   MONTHLY = 1,
